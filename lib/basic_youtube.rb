@@ -48,6 +48,7 @@ module BasicYoutube
       @dynamic_methods = {}
       @username = username
       @entry = nil
+      @all_videos=nil
     end
     
     def dynamic_methods
@@ -57,21 +58,34 @@ module BasicYoutube
   
     def entry
       @entry ||= self.class.call_youtube(@username)["entry"]
-      VALID_METHODS.each {|key| recursive_hash_access @dynamic_methods, @entry, key} if @dynamic_methods.blank?
-      define_feeds
+      if @dynamic_methods.blank?
+        VALID_METHODS.each {|key| recursive_hash_access @dynamic_methods, @entry, key} 
+        define_feeds
+      end
       return @entry
     rescue MultiXml::ParseError
       raise InvalidAccount
     end
     
     def pull_videos start=1, max_results=25
+      return @all_videos[start-1..start+max_results-1] if @all_videos.present?
       pull_raw_videos(start,max_results).map{|v| BasicYoutube::Video.new(v)}
     end
     
     def pull_all_videos
+      calls = (upload_count+1)/50
+      i = 0
+      videos = []
+      while i<=calls
+        videos << pull_videos(i*50+1, 50)
+        i+=1
+      end
+      @all_videos = videos
+      return videos
     end
     
     def pull_raw_videos start=1, max_results=25
+      max_results=50 if max_results-start>50
       self.class.call_youtube(@username,"/uploads?start-index=#{start}&max-results=#{max_results}")["feed"]["entry"]
     end
     
@@ -80,6 +94,11 @@ module BasicYoutube
       return true if @dynamic_methods.keys.include? method 
       super
     end
+    
+    def hours_uploaded
+      pull_all_videos.map(&:hours).sum
+    end
+    
     
     private
     
@@ -128,8 +147,10 @@ module BasicYoutube
     
     def entry
       @entry ||= self.class.call_youtube(@id)["entry"]
-
-      VALID_METHODS.each {|key| recursive_hash_access @dynamic_methods, @entry, key} if @dynamic_methods.blank?
+      if @dynamic_methods.blank?
+        VALID_METHODS.each {|key| recursive_hash_access @dynamic_methods, @entry, key}
+        define_links
+      end
       return @entry
     rescue MultiXml::ParseError
       raise InvalidVideo
@@ -153,17 +174,32 @@ module BasicYoutube
     def average_rating
       average = rating["average"].to_f
     end
+    
 
     private
     
-    def self.call_youtube id, nested_route=nil
+    def self.call_youtube top_route, nested_route=nil
       base_uri "https://gdata.youtube.com"
-      data = get "/feeds/api/videos/#{id}"
+      data = get "/feeds/api/videos/#{top_route}"
     end
     
     def method_missing method
       (entry;@dynamic_methods[method]) if @dynamic_methods.blank?
+      
+      return self.class.call_youtube(@dynamic_methods[method].split("videos/").last)["feed"]["entry"] if [:raw_video_responses,:raw_related_videos].include? method
+      return send("raw_#{method}").map{|v| BasicYoutube::Video.new(v)} if [:video_responses,:related_videos].include? method
+      
       @dynamic_methods[method] || super
+    end
+    
+    def define_links
+      puts "in define links"
+      (links = [:direct_link,:video_responses,:related_videos,:mobile_link,:api_link]).each do |key|
+        single_count = "#{key.to_s.singularize}_count".to_sym
+        current_link = link[links.index(key)]["href"]
+        @dynamic_methods[key] = current_link
+        @dynamic_methods["raw_#{key}".to_sym] = current_link
+      end
     end
     
   end
