@@ -131,7 +131,7 @@ module BasicYoutube
     
     VALID_METHODS = [:comments, :id, :published, :updated, :category, :title, :content, :link,
                      :author, :where, {:group => [:category, :content, :description, :keywords,
-                     :player, :thumbnail, :title, :duration]}, :rating, {:statistics =>
+                     :player, :thumbnail, :title, {:duration=>:seconds}]}, :rating, {:statistics =>
                      [:favorite_count, :view_count]}]
     
     def initialize video
@@ -173,6 +173,14 @@ module BasicYoutube
     
     def average_rating
       average = rating["average"].to_f
+    end
+    
+    def minutes
+      seconds.to_f/60
+    end
+    
+    def hours
+      minutes/60
     end
     
 
