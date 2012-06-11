@@ -1,6 +1,6 @@
 # BasicYoutube
 
-TODO: Write a gem description
+A basic youtube rails library created to provide access to public data.
 
 ## Installation
 
