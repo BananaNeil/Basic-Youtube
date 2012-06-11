@@ -5,7 +5,7 @@ module BasicYoutube
     format :xml
   
     VALID_METHODS = [:comments, :id, :published, :updated, :category, :title, :content, :link,
-                     :author, :where, {:group => [:category, :content, :description, :keywords,
+                     :where, {:group => [:category, :content, :description, :keywords,
                      :player, :thumbnail, :title, {:duration=>:seconds}]}, :rating, {:statistics =>
                      [:favorite_count, :view_count]}]
   
@@ -13,6 +13,10 @@ module BasicYoutube
       @dynamic_methods = {}
       @id = video.respond_to?(:keys) ? video["id"].split("/").last : video
       @entry = (video if video.respond_to?(:keys))
+    end
+    
+    def id
+      @id
     end
   
     def dynamic_methods
@@ -71,15 +75,13 @@ module BasicYoutube
     
       return self.class.call_youtube(@dynamic_methods[method].split("videos/").last)["feed"]["entry"] if [:raw_video_responses,:raw_related_videos].include? method
       return send("raw_#{method}").map{|v| BasicYoutube::Video.new(v)} if [:video_responses,:related_videos].include? method
-    
       @dynamic_methods[method] || super
     end
   
     def define_links
-      puts "in define links"
       (links = [:direct_link,:video_responses,:related_videos,:mobile_link,:api_link]).each do |key|
         single_count = "#{key.to_s.singularize}_count".to_sym
-        current_link = link[links.index(key)]["href"]
+        current_link = link[links.index(key)]["href"] if link.count>links.index(key)
         @dynamic_methods[key] = current_link
         @dynamic_methods["raw_#{key}".to_sym] = current_link
       end

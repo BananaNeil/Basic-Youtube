@@ -15,11 +15,6 @@ module BasicYoutube
       @entry = nil
       @all_videos=nil
     end
-  
-    def dynamic_methods
-      h={};@dynamic_methods.each {|k,v| h[v.class].nil? ? h[v.class]=[k] : h[v.class] << k}
-      return h
-    end
 
     def entry
       @entry ||= self.class.call_youtube(@username)["entry"]
@@ -42,7 +37,7 @@ module BasicYoutube
       i = 0
       videos = []
       while i<=calls
-        videos << pull_videos(i*50+1, 50)
+        pull_videos(i*50+1, 50).each {|v| videos << v}
         i+=1
       end
       @all_videos = videos
@@ -62,7 +57,8 @@ module BasicYoutube
     end
   
     def hours_uploaded
-      pull_all_videos.map(&:hours).sum
+      v=pull_all_videos
+      v.map(&:hours).sum
     end
   
   
